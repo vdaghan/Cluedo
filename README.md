@@ -1,0 +1,2 @@
+# Cluedo
+ Solver for Cluedo
