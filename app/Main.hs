@@ -14,5 +14,5 @@ import TestCases
 main :: IO ()
 main = do
     Cluedo.print (gS newGame)
-    where steps = testCase6
+    where steps = testCase7
           gS  = foldl (\g f -> (f.g)) (head steps) (tail steps)

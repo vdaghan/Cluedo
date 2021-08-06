@@ -164,7 +164,7 @@ module Cluedo where
         putStr "Answer probabilities: "
         Prelude.print aP
         where usefulClues = filter (isClueUseful gameState) (clues gameState)
-              outdatedClues = filter (isClueUseful gameState) (clues gameState)
+              outdatedClues = filter (not . isClueUseful gameState) (clues gameState)
               sST = solutionSpace gameState
               (upperBound, nSS, sS, sSP, aP) = sST
 

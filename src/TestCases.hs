@@ -181,3 +181,27 @@ module TestCases where
                     theyClaimNoAnswer 1 (2,2,5),
                     theyAccuse 2 (2,2,3) True
                 ]
+    
+    testCase7 = [   iAm 3,
+                    iHold ([], [], [2,5,8]),
+                    theyClaimTheyAnswer 1 (1,5,7) 4,
+                    theyClaimTheyAnswer 2 (2,2,9) 5,
+                    iClaimTheyAnswer (3,1,1) 4 1,
+                    theyClaimTheyAnswer 4 (4,6,7) 6,
+                    theyClaimIAnswer 5 (4,6,2) 3,
+                    theyClaimTheyAnswer 6 (3,1,8) 2,
+                    theyClaimTheyAnswer 1 (5,2,9) 5,
+                    theyClaimIAnswer 2 (5,2,2) 3,
+                    theyAccuse 2 (5,2,9) False,
+                    iClaimTheyAnswer (4,6,3) 4 2,
+                    theyClaimTheyAnswer 4 (3,2,8) 1,
+                    theyClaimTheyAnswer 5 (6,4,5) 2,
+                    theyClaimTheyAnswer 6 (6,4,4) 1,
+                    theyClaimTheyAnswer 1 (1,3,6) 2,
+                    iClaimTheyAnswer (6,4,3) 5 3,
+                    theyClaimTheyAnswer 4 (5,3,5) 6,
+                    theyClaimTheyAnswer 5 (3,3,8) 6,
+                    theyClaimTheyAnswer 6 (1,5,1) 1,
+                    theyClaimTheyAnswer 1 (2,1,1) 2,
+                    iClaimNoAnswer (4,4,8)
+                ]-- iAccuse (4,4,1) True
