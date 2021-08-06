@@ -13,13 +13,13 @@ module SolutionSpace where
               addRows r1 r2 = map (\r -> ((fst r) + (snd r))) (zip r1 r2)
               mapRow r = map (\c -> if c == cPossible then 1 else 0) r
               numPossibles = foldl (\p r -> addRows p (mapRow r)) (replicate 21 0) p
-              numPossibilities = map (\n -> if n == 0 then 1 else (n+1)) numPossibles
-              upperBound = foldl (\p n -> p * n) 1 numPossibilities
+              numPossibilities = map (\n -> if n == 0 then 1 else n+1) numPossibles
+              upperBound = product numPossibilities
 
     chooseNRecursion :: [Int] -> Int -> [[Int]] -> [[Int]]
     chooseNRecursion ls n choices
         | n <= 0 = choices
-        | otherwise = foldl (\p x -> p ++ (chooseNRecursion (dropWhile (<= x) ls) (n-1) [c ++ [x] | c <- choices])) [] ls
+        | otherwise = foldl (\p x -> p ++ chooseNRecursion (dropWhile (<= x) ls) (n-1) [c ++ [x] | c <- choices]) [] ls
     
     -- all n-element sublists of the list ls
     chooseN :: [Int] -> Int -> [[Int]]
@@ -31,26 +31,26 @@ module SolutionSpace where
     
     deleteAllFromList :: [Int] -> [Int] -> [Int]
     deleteAllFromList toDelete fromList
-        | length(toDelete) == 0 = fromList
+        | null toDelete = fromList
         | otherwise = deleteAllFromList (tail toDelete) (delete (head toDelete) fromList)
     
     deleteFromTupleList :: (Int, Int) -> [(Int, Int)] -> [(Int, Int)]
-    deleteFromTupleList toDelete fromTupleList = foldl (\p t -> if t == toDelete then p else p ++ [t]) [] fromTupleList
+    deleteFromTupleList toDelete = foldl (\p t -> if t == toDelete then p else p ++ [t]) []
 
     -- repeatedly choose n elements from list ls and replace them with i, where (n, i) <- directives
     chooseRepeatedlyRecursion :: [Int] -> [(Int, Int)] -> [[Int]] -> [[Int]]
     chooseRepeatedlyRecursion ls directives choices
-        | length(directives) == 0 = choices
+        | null directives = choices
         | otherwise = [ c | let d = head directives,
                             let n = fst d,
                             let i = snd d,
                             chosen <- chooseN ls n,
                             let ls' = deleteAllFromList chosen ls,
                             let choices' = [ replaceChoices c chosen i | c <- choices ],
-                            let d' = (deleteFromTupleList d directives),
-                            c <- (chooseRepeatedlyRecursion (ls') d' choices')]
-    chooseRepeatedly ls unknown known = chooseRepeatedlyRecursion (refinedList) unknown [replicate numChoices 0]
-        where numChoices = (length known) + (foldl (\p d -> p + (fst d)) 0 unknown)
+                            let d' = deleteFromTupleList d directives,
+                            c <- chooseRepeatedlyRecursion ls' d' choices']
+    chooseRepeatedly ls unknown known = chooseRepeatedlyRecursion refinedList unknown [replicate numChoices 0]
+        where numChoices = length known + foldl (\p d -> p + fst d) 0 unknown
               refinedList = deleteAllFromList known ls
 
     --getPersonListFromGameState gameState
@@ -67,16 +67,16 @@ module SolutionSpace where
               locationList = [13..21]
     gpr :: [[Int]] -> [Int] -> [Int]
     gpr (x:xs) (y:ys)
-        | length(xs) == 0 = (get y x)
-        | otherwise = (get y x) ++ (gpr xs ys)
+        | null xs = get y x
+        | otherwise = get y x ++ gpr xs ys
         where get ind ls
-                  | length(ls) >= ind = [snd ( head (filter (\t -> fst t == ind) (zip [0..(length(ls))-1] ls)))]
+                  | length ls >= ind = [snd ( head (filter (\t -> fst t == ind) (zip [0..length ls-1] ls)))]
                   | otherwise = []
-    enumLength ls = foldl (\p n -> p * length(n)) 1 ls
+    enumLength = foldl (\p n -> p * length n) 1
     enumToIndexList :: [Int] -> Int -> [Int]
     enumToIndexList ls ind
-        | length ls == 0 = []
-        | otherwise = [r] ++ enumToIndexList (tail ls) ind'
+        | null ls = []
+        | otherwise = r:enumToIndexList (tail ls) ind'
         where r = rem ind (head ls)
               ind' = div (ind - r) (head ls)
     
@@ -88,46 +88,46 @@ module SolutionSpace where
                       numState s = foldl (\p c -> if c == s then p + 1 else p) 0 col
                       numDefinites = numState cDefinitely
                       numImpossibles = numState cImpossible
-                      possibles = map (\t -> fst t) (filter (\t -> snd t == cPossible) (zip [1..6] col))
-                      definites = map (\t -> fst t) (filter (\t -> snd t == cDefinitely) (zip [1..6] col))
+                      possibles = map fst (filter (\t -> snd t == cPossible) (zip [1..6] col))
+                      definites = map fst (filter (\t -> snd t == cDefinitely) (zip [1..6] col))
                       encoded = possibles ++ (if numDefinites == 0 then [0] else definites)
-              encodedPossibilities = map (\e -> encodeColumn e) [1..21]
+              encodedPossibilities = map encodeColumn [1..21]
               numPossibilities = enumLength encodedPossibilities
-              encodedNumPossibilities = map (\e -> length e) encodedPossibilities
-              possibilities = map (\i -> gpr encodedPossibilities (enumToIndexList encodedNumPossibilities i)) [0..numPossibilities-1]
+              encodedNumPossibilities = map length encodedPossibilities
+              possibilities = map (gpr encodedPossibilities . enumToIndexList encodedNumPossibilities) [0..numPossibilities-1]
               -- Filter helpers
               personGroup = [1..6]
               weaponGroup = [7..12]
               locationGroup = [13..21]
-              findGroup g ls = map (\t -> snd t) (filter (\t -> elem (fst t) g) (zip [1..21] ls))
-              exactlyOneAnswerInGroup g ls = 1 == (foldl (\p e -> if e == 0 then p+1 else p) 0 (findGroup g ls))
-              usefulClues = filter (\c -> isClueUseful gameState c) (clues gameState)
+              findGroup g ls = map snd (filter (\t -> elem (fst t) g) (zip [1..21] ls))
+              exactlyOneAnswerInGroup g ls = 1 == foldl (\p e -> if e == 0 then p+1 else p) 0 (findGroup g ls)
+              usefulClues = filter (isClueUseful gameState) (clues gameState)
               unmapClue c = (pl, (unmapPersons ps, unmapWeapons ws, unmapLocations ls))
                 where (pl, (ps,ws,ls)) = c
-              respectsClue c lst = any (\e -> ((snd e) == pl) && (elem (fst e) (concat [ps,ws,ls]) ) ) (zip  [1..21] lst)
+              respectsClue c lst = any (\e -> (snd e == pl) && elem (fst e) (concat [ps,ws,ls]) ) (zip  [1..21] lst)
                 where (pl, (ps,ws,ls)) = unmapClue c
               rc c ls = respectsClue c ls
               -- Filters
               exactlyOneAnswerPerGroup ls = all (\g -> exactlyOneAnswerInGroup g ls) [personGroup, weaponGroup, locationGroup]
-              exactlyThreeAnswersPerPlayer ls = all (\p -> 3 == (foldl (\s pI -> if pI == p then s+1 else s) 0 (ls))) [1..6]
+              exactlyThreeAnswersPerPlayer ls = all (\p -> 3 == foldl (\s pI -> if pI == p then s+1 else s) 0 ls) [1..6]
               respectsClues ls = all (\c -> rc c ls) usefulClues
               --atMostOneAnswerPerClue is satisfied by design
               -- Application of filters
               filters = [ exactlyThreeAnswersPerPlayer, exactlyOneAnswerPerGroup, respectsClues ]
-              filteredPossibilities = foldl (\p f -> filter f p) (possibilities) (filters)
+              filteredPossibilities = foldl (flip filter) possibilities filters
 
     solutionSpaceProbabilities :: GameState -> [[Int]] -> [[Int]]
     solutionSpaceProbabilities gameState sS = probabilities
         where sSLen = length sS
               emptyBin = replicate 7 0
-              emptyProbabilities = replicate 21 (emptyBin)
+              emptyProbabilities = replicate 21 emptyBin
               addToBin bin ind = map (\t -> if fst t == ind then (snd t)+1 else (snd t)) (zip [0..6] bin)
               processSolution sol prob = map (\t -> addToBin (snd t) (fst t)) (zip sol prob)
-              occurences = foldl (\p s -> processSolution s p) emptyProbabilities sS
-              probabilities = map (\o -> (map (\p -> div (p*100) sSLen) o)) occurences
+              occurences = foldl (flip processSolution) emptyProbabilities sS
+              probabilities = map (map (\p -> div (p*100) sSLen)) occurences
               --probabilities = [ | solution <- sS ]
     
-    answerProbabilities sSP = map (\p -> head (take 1 p)) sSP
+    answerProbabilities = map (head . take 1)
     
     solutionSpace :: GameState -> (Integer, Int, [[Int]], [[Int]], [Int])
     solutionSpace gameState

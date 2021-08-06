@@ -12,10 +12,10 @@ module MPossessions where
     listToIndexedList row = zip [1..(length row)] row
 
     markStateInRow :: Int -> Int -> Row -> Row
-    markStateInRow index state row = [ if i == index then state else x | (i, x) <- (listToIndexedList row) ]
+    markStateInRow index state row = [ if i == index then state else x | (i, x) <- listToIndexedList row ]
     
     markStateInPossessions :: Int -> Int -> Int -> Possessions -> Possessions
-    markStateInPossessions pI cI s p = [ if i == pI then (markStateInRow cI s r) else r | (i, r) <- (listToIndexedList p) ]
+    markStateInPossessions pI cI s p = [ if i == pI then markStateInRow cI s r else r | (i, r) <- listToIndexedList p ]
     
     markDefiniteInPossessions :: Int -> Int -> Possessions -> Possessions
     markDefiniteInPossessions playerIndex clueIndex possessions = foldl (\p pI -> if pI == playerIndex then markStateInPossessions pI clueIndex cDefinitely p else markStateInPossessions pI clueIndex cImpossible p) possessions [1..6]
@@ -28,17 +28,20 @@ module MPossessions where
         | state == cImpossible = markStateInPossessions playerIndex clueIndex state possessions
         | state == cDefinitely = markDefiniteInPossessions playerIndex clueIndex possessions
 
-    mapIndex i = if i <= 6 then i else if i <= 12 then i-6 else i-12
-    mapIndices ls = map (\i -> if i <= 6 then i else if i <= 12 then i-6 else i-12) ls
+    mapIndex i
+        | i <= 6 = i
+        | i <= 12 = i-6
+        | otherwise = i-12
+    mapIndices = map (\i -> if i <= 6 then i else if i <= 12 then i-6 else i-12)
     unmapIndex i offset = i + offset
-    unmapPersons ls = map (\i -> i) ls
-    unmapWeapons ls = map (\i -> i+6) ls
-    unmapLocations ls = map (\i -> i+12) ls
-    myRow persons weapons locations = foldl (\p ls -> markInRowMultiple ls cDefinitely p) emptyRow [(unmapPersons persons), (unmapWeapons weapons), (unmapLocations locations)]
+    unmapPersons = id
+    unmapWeapons = map (+6)
+    unmapLocations = map (+12)
+    myRow persons weapons locations = foldl (\p ls -> markInRowMultiple ls cDefinitely p) emptyRow [unmapPersons persons, unmapWeapons weapons, unmapLocations locations]
     markMultipleDefinite playerIndex persons weapons locations possessions
-        | length persons > 0 = markMultipleDefinite playerIndex [] weapons locations (mark possessions p')
-        | length weapons > 0 = markMultipleDefinite playerIndex persons [] locations (mark possessions w')
-        | length locations > 0 = markMultipleDefinite playerIndex persons weapons [] (mark possessions l')
+        | not (null persons) = markMultipleDefinite playerIndex [] weapons locations (mark possessions p')
+        | not (null weapons) = markMultipleDefinite playerIndex persons [] locations (mark possessions w')
+        | not (null locations) = markMultipleDefinite playerIndex persons weapons [] (mark possessions l')
         | otherwise = possessions
         where p' = unmapPersons persons
               w' = unmapWeapons weapons
@@ -51,9 +54,9 @@ module MPossessions where
         | (asker > responder) && (asker-responder == 5) = []
         | otherwise = error "getPlayersBetween"
 
-    getNth ls ind = snd (head (filter (\t -> if (fst t) == ind then True else False) (zip [1..length(ls)] ls)))
+    getNth ls ind = snd (head (filter (\t -> fst t == ind) (zip [1..length ls] ls)))
 
-    getRow gameState ind = getNth p ind
+    getRow gameState = getNth p
         where p = possessions gameState
 
     getCol gameState ind = map (\r -> getNth (row r) ind) [1..6]
@@ -61,6 +64,6 @@ module MPossessions where
               row r = getRow gameState r
     
     numStateInColumn state column p = [ imp | row <- p,
-                                              iCol <- (zip [1..21] row),
-                                              (fst iCol == column),
-                                              let imp = if (snd iCol) == state then 1 else 0 ]
+                                              iCol <- zip [1..21] row,
+                                              fst iCol == column,
+                                              let imp = if snd iCol == state then 1 else 0 ]

@@ -9,20 +9,24 @@ module Cluedo where
     import SolutionSpace
     import Utilities
     
-    clueToChar clue = (if clue == cImpossible then "X " else if clue == cDefinitely then "O " else if clue == cPossible then ". " else "E ")
+    clueToChar clue
+        | clue == cImpossible = "X "
+        | clue == cDefinitely = "O "
+        | clue == cPossible = ". "
+        | otherwise = "E "
     clueBreak ind = if (ind == 7) || (ind == 13) then " | " else ""
-    printRow row = Prelude.print (concat (map (\i -> (clueBreak (fst i)) ++ (clueToChar (snd i))) (zip [1..length(row)] row)))
-    printGameState gameState = mapM_ (\r -> printRow r) gameState
+    printRow row = Prelude.print (concatMap (\i -> clueBreak (fst i) ++ clueToChar (snd i)) (zip [1..length row] row))
+    printGameState gameState = mapM_ (\r -> printRow r) gameState -- hlint hints at something called Eta reduce?
 
-    combination n k = round( (foldl (*) 1 [n-k+1..n]) / (foldl (*) 1 [1..k]) )
-    numSolutions = (c 6 1) * (c 6 1) * (c 9 1) * (c 15 3) * (c 12 3) * (c 9 3) * (c 6 3) where c = combination
+    combination n k = round( product [n-k+1..n] / product [1..k] )
+    numSolutions = c 6 1 * c 6 1 * c 9 1 * c 15 3 * c 12 3 * c 9 3 * c 6 3 where c = combination
 
     answers = [ [(1, x), (2, y), (3, z)] | x <- [1..6], y <- [1..6], z <- [1..9] ]
     
 
 
     newGame :: GameState
-    newGame = GameState { myid = -1, possessions = (replicate 6 emptyRow), clues = [] }
+    newGame = GameState { myid = -1, possessions = replicate 6 emptyRow, clues = [] }
     iAm :: Int -> GameState -> GameState
     iAm myid gameState = GameState {myid = myid, possessions = possessions gameState, clues = clues gameState}
     iHold :: ([Int], [Int], [Int]) -> GameState -> GameState
@@ -44,8 +48,11 @@ module Cluedo where
               cIList = [head (unmapPersons [person]), head (unmapWeapons [weapon]), head (unmapLocations [location])]
               p = possessions gameState
               plcITuples = [ (pl, cI) | pl <- playersBetween, cI <- cIList ]
-              p' = foldl (\pos plcI -> markStateInPossessions (fst plcI) (snd plcI) cImpossible pos) p plcITuples
-              cI = if answer == 1 then head cIList else if answer == 2 then head (tail cIList) else head (tail (tail cIList))
+              p' = foldl (\pos plcI -> uncurry markStateInPossessions plcI cImpossible pos) p plcITuples
+              cI
+                  | answer == 1 = head cIList
+                  | answer == 2 = head (tail cIList)
+                  | otherwise = head (tail (tail cIList))
               p'' = markDefiniteInPossessions responder cI p'
               gS' = GameState {myid = myid gameState, possessions = p'', clues = clues gameState}
     -- If they claim and there is no answer, then either asker holds claimed cards or they are parts of solution
@@ -56,7 +63,7 @@ module Cluedo where
               cIList = [head (unmapPersons [person]), head (unmapWeapons [weapon]), head (unmapLocations [location])]
               p = possessions gameState
               plcITuples = [ (pl, cI) | pl <- playersBetween, cI <- cIList ]
-              p' = foldl (\pos plcI -> markStateInPossessions (fst plcI) (snd plcI) cImpossible pos) p plcITuples
+              p' = foldl (\pos plcI -> uncurry markStateInPossessions plcI cImpossible pos) p plcITuples
               gS' = GameState {myid = myid gameState, possessions = p', clues = clues gameState}
     -- If they claim and I answer, then the players between asker and me does not hold any of the claimed cards
     theyClaimIAnswer :: Int -> Claim -> Int -> GameState -> GameState
@@ -66,7 +73,7 @@ module Cluedo where
               cIList = [head (unmapPersons [person]), head (unmapWeapons [weapon]), head (unmapLocations [location])]
               p = possessions gameState
               plcITuples = [ (pl, cI) | pl <- playersBetween, cI <- cIList ]
-              p' = foldl (\pos plcI -> markStateInPossessions (fst plcI) (snd plcI) cImpossible pos) p plcITuples
+              p' = foldl (\pos plcI -> uncurry markStateInPossessions plcI cImpossible pos) p plcITuples
               gS' = GameState {myid = myid gameState, possessions = p', clues = clues gameState}
     -- If they claim and they answer, then responder holds at least one of the claimed cards
     --     Also, players between asker and responder does not hold any of the claimed cards
@@ -77,9 +84,9 @@ module Cluedo where
               cIList = [head (unmapPersons [person]), head (unmapWeapons [weapon]), head (unmapLocations [location])]
               p = possessions gameState
               plcITuples = [ (pl, cI) | pl <- playersBetween, cI <- cIList ]
-              p' = foldl (\pos plcI -> markStateInPossessions (fst plcI) (snd plcI) cImpossible pos) p plcITuples
+              p' = foldl (\pos plcI -> uncurry markStateInPossessions plcI cImpossible pos) p plcITuples
               gS' = GameState {myid = myid gameState, possessions = p', clues = clues gameState}
-              clue = (claimToClue responder claim)
+              clue = claimToClue responder claim
               gS'' = noteClue gS' clue
     -- If they accuse and the answer is wrong, then at least one of the claimed cards is not a solution
     theyAccuse :: Int -> Claim -> Bool -> GameState -> GameState
@@ -94,31 +101,31 @@ module Cluedo where
               weaponIndices = [7..12]
               locationIndices = [13..21]
               statesInColumn state column = [ imp | row <- p,
-                                                    iCol <- (zip [1..21] row),
-                                                    (fst iCol == column),
-                                                    let imp = if (snd iCol) == state then 1 else 0 ]
-              numImpossiblesInColumn column = foldl (\p c -> p + c) 0 (statesInColumn cImpossible column)
-              numImpossiblesInColumns columns = map (\c -> numImpossiblesInColumn c) columns
-              solvedForPersons = any (6==) (numImpossiblesInColumns personIndices)
-              solvedForWeapons = any (6==) (numImpossiblesInColumns weaponIndices)
-              solvedForLocations = any (6==) (numImpossiblesInColumns locationIndices)
-              numDefinitesInColumn column = foldl (\p c -> p + c) 0 (statesInColumn cDefinitely column)
-              numDefinitesInColumns columns = map (\c -> numDefinitesInColumn c) columns
-              numPossiblesInColumn column = foldl (\p c -> p + c) 0 (statesInColumn cPossible column)
-              numPossiblesInColumns columns = map (\c -> numPossiblesInColumn c) columns
+                                                    iCol <- zip [1..21] row,
+                                                    fst iCol == column,
+                                                    let imp = if snd iCol == state then 1 else 0 ]
+              numImpossiblesInColumn column = sum (statesInColumn cImpossible column)
+              numImpossiblesInColumns columns = map numImpossiblesInColumn columns
+              solvedForPersons = elem 6 (numImpossiblesInColumns personIndices)
+              solvedForWeapons = elem 6 (numImpossiblesInColumns weaponIndices)
+              solvedForLocations = elem 6 (numImpossiblesInColumns locationIndices)
+              numDefinitesInColumn column = sum (statesInColumn cDefinitely column)
+              numDefinitesInColumns columns = map numDefinitesInColumn columns
+              numPossiblesInColumn column = sum (statesInColumn cPossible column)
+              numPossiblesInColumns columns = map numPossiblesInColumn columns
               pruneIncomplete pp solved indices
-                  | solved = [ [ c | iCol <- (zip [1..21] row),
+                  | solved = [ [ c | iCol <- zip [1..21] row,
                                      let col = snd iCol,
                                      let indCol = fst iCol,
-                                     let c = if (elem indCol indices) && ((numImpossiblesInColumn indCol) == 5) && ((numPossiblesInColumn indCol) == 1) && (col == cPossible) then cDefinitely else col ] | row <- pp ]
+                                     let c = if elem indCol indices && (numImpossiblesInColumn indCol == 5) && (numPossiblesInColumn indCol == 1) && (col == cPossible) then cDefinitely else col ] | row <- pp ]
                   | otherwise = pp
               p1 = pruneIncomplete p solvedForPersons personIndices
               p2 = pruneIncomplete p1 solvedForWeapons weaponIndices
               p3 = pruneIncomplete p2 solvedForLocations locationIndices
-              solvedForGroup' indices = (length(indices)-1) == (foldl (\p n -> p+n) 0 (numDefinitesInColumns indices))
+              solvedForGroup' indices = (length indices - 1) == sum (numDefinitesInColumns indices)
               markAnswerInColumn col pos = foldl (\pos' r -> markInPossessions r col cImpossible pos' ) pos [1..6]
               markOnly pp indices
-                  | solvedForGroup' indices = foldl (\pp' i -> if (any (1==) (statesInColumn cDefinitely i)) then pp' else (markAnswerInColumn i pp') ) pp indices
+                  | solvedForGroup' indices = foldl (\pp' i -> if elem 1 (statesInColumn cDefinitely i) then pp' else markAnswerInColumn i pp' ) pp indices
                   | otherwise = pp
               p4 = markOnly p3 personIndices
               p5 = markOnly p4 weaponIndices
@@ -136,28 +143,28 @@ module Cluedo where
               gS' = GameState {myid = myid gameState, possessions = p', clues = clues gameState}
               gS'' = processClues gS'
               gS''' = checkSolutionPerGroup gS''
-              changed = p /= (possessions gS''')
+              changed = p /= possessions gS'''
               gS'''' = if changed then checkGameState gS''' else gS'''
     
     print :: GameState -> IO()
     print gameState = do
         printGameState (possessions gameState)
         putStr "Useful Clues: "
-        Prelude.print (usefulClues)
+        Prelude.print usefulClues
         putStr "Outdated Clues: "
-        Prelude.print (outdatedClues)
+        Prelude.print outdatedClues
         putStr "Solution space length (upperbound): "
-        Prelude.print (upperBound)
+        Prelude.print upperBound
         putStr "Solution space length: "
-        Prelude.print (nSS)
+        Prelude.print nSS
         putStr "Solution space: "
-        Prelude.print (sS)
+        Prelude.print sS
         putStr "Solution space probabilities: "
-        Prelude.print (sSP)
+        Prelude.print sSP
         putStr "Answer probabilities: "
-        Prelude.print (aP)
-        where usefulClues = filter (\c -> isClueUseful gameState c) (clues gameState)
-              outdatedClues = filter (\c -> not (isClueUseful gameState c)) (clues gameState)
+        Prelude.print aP
+        where usefulClues = filter (isClueUseful gameState) (clues gameState)
+              outdatedClues = filter (isClueUseful gameState) (clues gameState)
               sST = solutionSpace gameState
               (upperBound, nSS, sS, sSP, aP) = sST
 

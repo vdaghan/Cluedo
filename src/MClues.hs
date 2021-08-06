@@ -13,13 +13,13 @@ module MClues where
               persons' = unmapPersons persons
               weapons' = unmapWeapons weapons
               locations' = unmapLocations locations
-              isIndexOfPerson = (\t -> ([] /= persons') && (t == head persons'))
-              isIndexOfWeapon = (\t -> ([] /= weapons') && (t == head weapons'))
-              isIndexOfLocation = (\t -> ([] /= locations') && (t == head locations'))
-              isIndexOfClue = (\t -> (isIndexOfPerson t) || (isIndexOfWeapon t) || (isIndexOfLocation t))
-              indexedTuplesCorrespondingToAnswer = filter (\t -> if (isIndexOfClue (fst t)) then True else False) (zip [1..length(playerRow)] playerRow)
-              columnCorrespondingToAnswer = map (\t -> snd t) indexedTuplesCorrespondingToAnswer
-              coincidesWithADefinite = any (cDefinitely==) columnCorrespondingToAnswer
+              isIndexOfPerson = \t -> ([] /= persons') && (t == head persons')
+              isIndexOfWeapon = \t -> ([] /= weapons') && (t == head weapons')
+              isIndexOfLocation = \t -> ([] /= locations') && (t == head locations')
+              isIndexOfClue = \t -> isIndexOfPerson t || isIndexOfWeapon t || isIndexOfLocation t
+              indexedTuplesCorrespondingToAnswer = filter (isIndexOfClue . fst) (zip [1..length playerRow] playerRow)
+              columnCorrespondingToAnswer = map snd indexedTuplesCorrespondingToAnswer
+              coincidesWithADefinite = elem cDefinitely columnCorrespondingToAnswer
               result = not coincidesWithADefinite
     noteClue :: GameState -> Clue -> GameState
     noteClue gameState clue
@@ -39,16 +39,16 @@ module MClues where
               persons' = unmapPersons persons
               weapons' = unmapWeapons weapons
               locations' = unmapLocations locations
-              isIndexOfPerson = (\t -> ([] /= persons') && (t == head persons'))
-              isIndexOfWeapon = (\t -> ([] /= weapons') && (t == head weapons'))
-              isIndexOfLocation = (\t -> ([] /= locations') && (t == head locations'))
-              isIndexOfClue = (\t -> (isIndexOfPerson t) || (isIndexOfWeapon t) || (isIndexOfLocation t))
-              indexedTuplesCorrespondingToAnswer = filter (\t -> if (isIndexOfClue (fst t)) then True else False) (zip [1..length(playerRow)] playerRow)
+              isIndexOfPerson = \t -> ([] /= persons') && (t == head persons')
+              isIndexOfWeapon = \t -> ([] /= weapons') && (t == head weapons')
+              isIndexOfLocation = \t -> ([] /= locations') && (t == head locations')
+              isIndexOfClue = \t -> isIndexOfPerson t || isIndexOfWeapon t || isIndexOfLocation t
+              indexedTuplesCorrespondingToAnswer = filter (isIndexOfClue . fst) (zip [1..length playerRow] playerRow)
               indexedUnresolvedPart = filter (\t -> snd t == cPossible) indexedTuplesCorrespondingToAnswer
-              unresolvedPart = map (\t -> fst t) indexedUnresolvedPart
+              unresolvedPart = map fst indexedUnresolvedPart
     groupClueSetsByPlayer :: GameState -> [(Int, [([Int], [Int], [Int])])]
     groupClueSetsByPlayer gameState = result
-        where usefulClues = filter (\c -> isClueUseful gameState c) (clues gameState)
+        where usefulClues = filter (isClueUseful gameState) (clues gameState)
               cluesFromPlayer player = (player, [ snd c | c <- usefulClues, fst c == player ])
               result = [ cluesFromPlayer p | p <- [1..6] ]
     doCluesIntersect :: ([Int], [Int], [Int]) -> ([Int], [Int], [Int]) -> Bool
@@ -61,62 +61,62 @@ module MClues where
               p2' = unmapPersons p2
               w2' = unmapWeapons w2
               l2' = unmapLocations l2
-              personsIntersect = ([] /= p1') && ([] /= p2') && ((head p1') == (head p2'))
-              weaponsIntersect = ([] /= w1') && ([] /= w2') && ((head w1') == (head w2'))
-              locationsIntersect = ([] /= l1') && ([] /= l2') && ((head l1') == (head l2'))
+              personsIntersect = ([] /= p1') && ([] /= p2') && (head p1' == head p2')
+              weaponsIntersect = ([] /= w1') && ([] /= w2') && (head w1' == head w2')
+              locationsIntersect = ([] /= l1') && ([] /= l2') && (head l1' == head l2')
     findDisjointClueSets gameState = disjointClues
         where clueSetsByPlayer = groupClueSetsByPlayer gameState
-              mapDisjointClues clueSet = map (\c -> [c] ++ (filter (\c' -> not (doCluesIntersect c c')) clueSet)) clueSet
-              disjointCluesFromPlayer player = (player, head [ mapDisjointClues (snd cS) | cS <- clueSetsByPlayer, (fst cS) == player ])
+              mapDisjointClues clueSet = map (\c -> c:filter (not . doCluesIntersect c) clueSet) clueSet
+              disjointCluesFromPlayer player = (player, head [ mapDisjointClues (snd cS) | cS <- clueSetsByPlayer, fst cS == player ])
               disjointClues = [ disjointCluesFromPlayer p | p <- [1..6] ]
     --maxDisjointClueSets :: GameState -> [(Int, Int)]
     safeMaximum ls
-        | length(ls) == 0 = 0
+        | null ls = 0
         | otherwise = maximum ls
     maxDisjointClueSets gameState = result
         where disjointClueSets = findDisjointClueSets gameState
-              numDisjointClues clueSet = map (\c -> length c) clueSet
+              numDisjointClues clueSet = map length clueSet
               result = [ (p, safeMaximum (numDisjointClues cS)) | dC <- disjointClueSets, let (p, cS) = dC ]
     knownsForClueSet :: [([Int], [Int], [Int])] -> [Int]
-    knownsForClueSet clueSet = foldl (\p c -> p ++ (getPWL c)) [] clueSet
-        where getP (p,w,l) = if p == [] then [] else (unmapPersons p)
-              getW (p,w,l) = if w == [] then [] else (unmapWeapons w)
-              getL (p,w,l) = if l == [] then [] else (unmapLocations l)
-              getPWL (p,w,l) = (getP (p,w,l)) ++ (getW (p,w,l)) ++ (getL (p,w,l))
+    knownsForClueSet = foldl (\p c -> p ++ getPWL c) []
+        where getP (p,w,l) = if null p then [] else unmapPersons p
+              getW (p,w,l) = if null w then [] else unmapWeapons w
+              getL (p,w,l) = if null l then [] else unmapLocations l
+              getPWL (p,w,l) = getP (p,w,l) ++ getW (p,w,l) ++ getL (p,w,l)
     powerSet cS
-        | (length cS == 0) = [[]]
-        | otherwise = [ x:ps | let (x:xs) = cS, ps <- powerSet xs] ++ (powerSet (tail cS))
-    findDisjointClues cS = filter (\cS' -> isClueSetDisjoint cS') pS
-        where doesClueIntersectWithClueSet clue clueSet = any (\c' -> doCluesIntersect clue c') clueSet
-              isClueSetDisjoint clueSet = not (any (True==) [ doCluesIntersect c' c'' | c' <- clueSet, c'' <- clueSet, c' /= c'' ])
-              pS = filter (\s -> length(s) /= 0) (powerSet cS)
-    deleteElemsFromList elems ls = foldl (\l e -> delete e l) ls elems
+        | null cS = [[]]
+        | otherwise = [ x:ps | let (x:xs) = cS, ps <- powerSet xs] ++ powerSet (tail cS)
+    findDisjointClues cS = filter isClueSetDisjoint pS
+        where doesClueIntersectWithClueSet clue clueSet = any (doCluesIntersect clue) clueSet
+              isClueSetDisjoint clueSet = notElem True [ doCluesIntersect c' c'' | c' <- clueSet, c'' <- clueSet, c' /= c'' ]
+              pS = filter (not . null) (powerSet cS)
+    deleteElemsFromList elems ls = foldl (flip delete) ls elems
     processDisjointClues :: GameState -> [(Int, [Int])]
     processDisjointClues gameState = result
         where clueSetsByPlayer = {-trace ("clueSetsByPlayer: " ++ show (groupClueSetsByPlayer gameState))-} groupClueSetsByPlayer gameState
-              disjointCluesFromPlayer player = (player, head [ findDisjointClues (snd cS) | cS <- clueSetsByPlayer, (fst cS) == player ])
+              disjointCluesFromPlayer player = (player, head [ findDisjointClues (snd cS) | cS <- clueSetsByPlayer, fst cS == player ])
               disjointClueSets = {-trace ("disjointCluesFromPlayer: " ++ show ([ disjointCluesFromPlayer p | p <- [1..6] ]))-} [ disjointCluesFromPlayer p | p <- [1..6] ]
-              numDisjointClues clueSet = map (\c -> length c) clueSet
+              numDisjointClues clueSet = map length clueSet
               maxDisjointClueLengths :: [(Int, Int)]
               maxDisjointClueLengths = [ (p, safeMaximum (numDisjointClues cS)) | dC <- disjointClueSets, let (p, cS) = dC ]
               maxDisjointClueLengthForPlayer :: Int -> Int
-              maxDisjointClueLengthForPlayer p = snd (head (filter (\t -> (fst t) == p) maxDisjointClueLengths))
+              maxDisjointClueLengthForPlayer p = snd (head (filter (\t -> fst t == p) maxDisjointClueLengths))
               unknownsForClueSet clueSet = deleteElemsFromList (knownsForClueSet clueSet) [1..21]
-              definitesInRow row = foldl (\p t -> if (snd t) == cDefinitely then p ++ [fst t] else p) [] (zip [1..21] row)
-              impossiblesInRow row = foldl (\p t -> if (snd t) == cImpossible then p ++ [fst t] else p) [] (zip [1..21] row)
+              definitesInRow row = foldl (\p t -> if snd t == cDefinitely then p ++ [fst t] else p) [] (zip [1..21] row)
+              impossiblesInRow row = foldl (\p t -> if snd t == cImpossible then p ++ [fst t] else p) [] (zip [1..21] row)
               impossiblesForClueSets = [ (p, properUnknowns) | dC <- disjointClueSets,
                                                          let (p, cS) = dC,
                                                          c <- cS,
-                                                         length(c) == (maxDisjointClueLengthForPlayer p),
+                                                         length c == maxDisjointClueLengthForPlayer p,
                                                          let row = getRow gameState p,
                                                          let unknowns = deleteElemsFromList (definitesInRow row) (unknownsForClueSet c),
-                                                         let properUnknowns = deleteElemsFromList (impossiblesInRow row) (unknowns),
-                                                         length(c) + length(definitesInRow row) == 3 ]
+                                                         let properUnknowns = deleteElemsFromList (impossiblesInRow row) unknowns,
+                                                         length c + length(definitesInRow row) == 3 ]
               result = {-trace ("impossibles: " ++ show impossiblesForClueSets)-} impossiblesForClueSets
 
     processClue :: GameState -> Clue -> GameState
     processClue gameState clue
-        | (isClueUseful gameState clue) && ((length unresolvedPart) == 1) = gS'
+        | isClueUseful gameState clue && (length unresolvedPart == 1) = gS'
         | otherwise = gameState
         where p = possessions gameState
               (player, (persons, weapons, locations)) = clue
@@ -125,9 +125,9 @@ module MClues where
               gS' = GameState {myid = myid gameState, possessions = p', clues = clues gameState}
     processClues :: GameState -> GameState
     processClues gameState = gS''
-        where gS' = foldl (\gS c -> processClue gS c) gameState (clues gameState)
+        where gS' = foldl processClue gameState (clues gameState)
               impossibles = processDisjointClues gS'
               p = possessions gS'
               markMultipleInPossessions pI cIList state pos = foldl (\pp cI -> markInPossessions pI cI state pp) pos cIList
-              p' = foldl (\pp i -> markMultipleInPossessions (fst i) (snd i) cImpossible pp) p impossibles
+              p' = foldl (\pp i -> uncurry markMultipleInPossessions i cImpossible pp) p impossibles
               gS'' = GameState {myid = myid gameState, possessions = p', clues = clues gameState}
